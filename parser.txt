@@ -1,0 +1,552 @@
+import java.util.ArrayList;
+import java.util.Objects;
+
+public class Parser {
+    private final ArrayList<SymTab> symTab;
+    private ArrayList<String> out;
+    private int t = 0;
+
+    public Parser(ArrayList<SymTab> symTabs) {
+        symTab = symTabs;
+        out = new ArrayList<>();
+    }
+
+    public void analyse() {
+        //for(int i=0;i<symTab.size();i++) {
+        ////System.out.println(symTab.get(i).getIdCode()+" " + symTab.get(i).getName());
+        //}
+        CompUnit();
+        //for(int i=0;i<out.size();i++) {
+        ////System.out.println(out.get(i));
+        //}
+    }
+
+    public ArrayList<String> getOut() {
+        return out;
+    }
+
+    private void addToken(String idcode) {
+        //System.out.print(symTab.get(t).getIdCode() + " " + idcode + " " + symTab.get(t).getName() + " ");
+        if (!Objects.equals(symTab.get(t).getIdCode(), idcode)) {
+            System.out.print(t);
+            System.out.println("  !!!!!  ");
+        } else {
+            //System.out.println(t);
+        }
+        if (Objects.equals(symTab.get(t).getIdCode(), idcode)) {
+            out.add(symTab.get(t).getIdCode() + " " + symTab.get(t).getName());
+        }
+        t++;
+    }
+
+    private void CompUnit() { //CompUnit → {Decl} {FuncDef} MainFuncDef
+        while (isDecl()) {
+            //System.out.println("???Decl");
+            Decl();
+            //System.out.println("???Decl END");
+        }
+        while (isFuncDef()) {
+            FuncDef();
+        }
+        MainFuncDef();
+        out.add("<CompUnit>");
+    }
+
+    private boolean isDecl() {
+        if (Objects.equals(symTab.get(t).getIdCode(), "CONSTTK")) {
+            return true;
+        } else if (Objects.equals(symTab.get(t).getIdCode(), "INTTK")) {
+            if (Objects.equals(symTab.get(t + 2).getIdCode(), "LPARENT")) {
+                return false;
+            } else {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean isFuncDef() {
+        if (Objects.equals(symTab.get(t + 1).getIdCode(), "MAINTK")) {
+            return false;
+        } else {
+            return true;
+        }
+    }
+
+    private void Decl() { //Decl → ConstDecl | VarDecl
+        if (Objects.equals(symTab.get(t).getIdCode(), "CONSTTK")) {
+            ////System.out.println("???ConstDecl");
+            ConstDecl();
+            ////System.out.println("???ConstDecl END");
+        } else {
+            //System.out.println("???VarDecl");
+            VarDecl();
+            //System.out.println("???VarDecl end");
+        }
+        //out.add("<Decl>");
+    }
+
+    private void ConstDecl() { //ConstDecl → 'const' BType ConstDef { ',' ConstDef } ';'
+        addToken("CONSTTK");
+        BType();
+        ConstDef();
+        while (Objects.equals(symTab.get(t).getIdCode(), "COMMA")) {
+            addToken("COMMA");
+            ConstDef();
+        }
+        addToken("SEMICN");
+        out.add("<ConstDecl>");
+    }
+
+    private void BType() { //BType → 'int'
+        addToken("INTTK");
+        //out.add("<BType>");
+    }
+
+    private void ConstDef() { //ConstDef → Ident { '[' ConstExp ']' } '=' ConstInitVal
+        addToken("IDENFR");
+        while (Objects.equals(symTab.get(t).getIdCode(), "LBRACK")) {
+            addToken("LBRACK");
+            ConstExp();
+            addToken("RBRACK");
+        }
+        addToken("ASSIGN");
+        ConstInitVal();
+        out.add("<ConstDef>");
+    }
+
+    private void ConstExp() { //ConstExp → AddExp
+        AddExp();
+        out.add("<ConstExp>");
+    }
+
+    private void AddExp() { //AddExp → MulExp | AddExp ('+' | '−') MulExp
+        MulExp();
+        while (Objects.equals(symTab.get(t).getIdCode(), "PLUS") || Objects.equals(symTab.get(t).getIdCode(), "MINU")) {
+            if (Objects.equals(symTab.get(t).getIdCode(), "PLUS")) {
+                addToken("PLUS");
+                MulExp();
+            } else {
+                addToken("MINU");
+                MulExp();
+            }
+        }
+        out.add("<AddExp>");
+    }
+
+    private void MulExp() { //MulExp → UnaryExp | MulExp ('*' | '/' | '%') UnaryExp
+        //System.out.println("???UnaryExp");
+        UnaryExp();
+        //System.out.println("???UnaryExp END");
+        while (Objects.equals(symTab.get(t).getIdCode(), "MULT") ||
+                Objects.equals(symTab.get(t).getIdCode(), "DIV") ||
+                Objects.equals(symTab.get(t).getIdCode(), "MOD")) {
+            if (Objects.equals(symTab.get(t).getIdCode(), "MULT")) {
+                addToken("MULT");
+                UnaryExp();
+            } else if (Objects.equals(symTab.get(t).getIdCode(), "DIV")) {
+                addToken("DIV");
+                UnaryExp();
+            } else {
+                addToken("MOD");
+                UnaryExp();
+            }
+        }
+        out.add("<MulExp>");
+    }
+
+    /*
+    UnaryExp → PrimaryExp
+    | Ident '(' [FuncRParams] ')' // 3种情况均需覆盖, 函数调用也需要覆盖FuncRParams的不同情况
+     | UnaryOp UnaryExp // 存在即可
+     */
+
+    private void UnaryExp() {
+        if (isPrimaryExp()) {
+            //System.out.println("1");
+            PrimaryExp();
+        } else if (Objects.equals(symTab.get(t).getIdCode(), "PLUS") ||
+                Objects.equals(symTab.get(t).getIdCode(), "MINU") ||
+                Objects.equals(symTab.get(t).getIdCode(), "NOT")) {
+            UnaryOp();
+            UnaryExp();
+        } else {
+            //System.out.println("3");
+            addToken("IDENFR");
+            addToken("LPARENT");
+            if (!Objects.equals(symTab.get(t).getIdCode(), "RPARENT")) {
+                FuncRParams();
+            }
+            addToken("RPARENT");
+        }
+        out.add("<UnaryExp>");
+    }
+
+    private boolean isPrimaryExp() {
+        if (Objects.equals(symTab.get(t).getIdCode(), "IDENFR") &&
+                Objects.equals(symTab.get(t + 1).getIdCode(), "LPARENT")) {
+            return false;
+        }
+        if (Objects.equals(symTab.get(t).getIdCode(), "PLUS") ||
+                Objects.equals(symTab.get(t).getIdCode(), "MINU") ||
+                Objects.equals(symTab.get(t).getIdCode(), "NOT")) {
+            return false;
+        }
+        return true;
+    }
+
+    private void UnaryOp() {
+        if (Objects.equals(symTab.get(t).getIdCode(), "PLUS")) {
+            addToken("PLUS");
+        } else if (Objects.equals(symTab.get(t).getIdCode(), "MINU")) {
+            addToken("MINU");
+        } else {
+            addToken("NOT");
+        }
+        out.add("<UnaryOp>");
+    }
+
+    private void PrimaryExp() { //PrimaryExp → '(' Exp ')' | LVal | Number
+        if (Objects.equals(symTab.get(t).getIdCode(), "LPARENT")) {
+            addToken("LPARENT");
+            Exp();
+            addToken("RPARENT");
+        } else if (Objects.equals(symTab.get(t).getIdCode(), "INTCON")) {
+            Number_();
+        } else {
+            LVal();
+        }
+        out.add("<PrimaryExp>");
+    }
+
+    private void Number_() {
+        addToken("INTCON");
+        out.add("<Number>");
+    }
+
+    private void FuncRParams() {//Exp { ',' Exp }
+        Exp();
+        while (Objects.equals(symTab.get(t).getIdCode(), "COMMA")) {
+            addToken("COMMA");
+            Exp();
+        }
+        out.add("<FuncRParams>");
+    }
+
+    private void ConstInitVal() {//ConstInitVal → ConstExp | '{' [ ConstInitVal { ',' ConstInitVal } ] '}'
+        if(!Objects.equals(symTab.get(t).getIdCode(), "LBRACE")){
+            ConstExp();
+        }else {
+            addToken("LBRACE");
+            if(!Objects.equals(symTab.get(t).getIdCode(), "RBRACE")){
+                ConstInitVal();
+                while (Objects.equals(symTab.get(t).getIdCode(), "COMMA")){
+                    addToken("COMMA");
+                    ConstInitVal();
+                }
+            }
+            addToken("RBRACE");
+        }
+        out.add("<ConstInitVal>");
+    }
+
+    private void VarDecl() { //VarDecl → BType VarDef { ',' VarDef } ';'
+        BType();
+        //System.out.println("???VarDef");
+        VarDef();
+        //System.out.println("???VarDef END");
+        while (Objects.equals(symTab.get(t).getIdCode(), "COMMA")) {
+            addToken("COMMA");
+            VarDef();
+        }
+        addToken("SEMICN");
+        out.add("<VarDecl>");
+    }
+
+    /*
+    VarDef → Ident { '[' ConstExp ']' } // 包含普通变量、一维数组、二维数组定义
+    | Ident { '[' ConstExp ']' } '=' InitVal
+     */
+    private void VarDef() {
+        addToken("IDENFR");
+        while (Objects.equals(symTab.get(t).getIdCode(), "LBRACK")) {
+            addToken("LBRACK");
+            ConstExp();
+            addToken("RBRACK");
+        }
+        if (Objects.equals(symTab.get(t).getIdCode(), "ASSIGN")) {
+            addToken("ASSIGN");
+            InitVal();
+        }
+        out.add("<VarDef>");
+    }
+
+    //InitVal → Exp | '{' [ InitVal { ',' InitVal } ] '}'
+    private void InitVal() {
+        if (Objects.equals(symTab.get(t).getIdCode(), "LBRACE")) {
+            addToken("LBRACE");
+            if (!Objects.equals(symTab.get(t).getIdCode(), "RBRACE")) {
+                InitVal();
+                while (Objects.equals(symTab.get(t).getIdCode(), "COMMA")) {
+                    addToken("COMMA");
+                    InitVal();
+                }
+            }
+            addToken("RBRACE");
+        } else {
+            Exp();
+        }
+        out.add("<InitVal>");
+    }
+
+    private void FuncDef() { //FuncDef → FuncType Ident '(' [FuncFParams] ')' Block
+        FuncType();
+        addToken("IDENFR");
+        addToken("LPARENT");
+        if (!Objects.equals(symTab.get(t).getIdCode(), "RPARENT")) {
+            FuncFParams();
+        }
+        addToken("RPARENT");
+        Block_();
+        out.add("<FuncDef>");
+    }
+
+    private void FuncType() { //FuncType → 'void' | 'int'
+        if (Objects.equals(symTab.get(t).getIdCode(), "VOIDTK")) {
+            addToken("VOIDTK");
+        } else {
+            addToken("INTTK");
+        }
+        out.add("<FuncType>");
+    }
+
+    private void FuncFParams() {//FuncFParams → FuncFParam { ',' FuncFParam }
+        FuncFParam();
+        while (Objects.equals(symTab.get(t).getIdCode(), "COMMA")) {
+            addToken("COMMA");
+            FuncFParam();
+        }
+        out.add("<FuncFParams>");
+    }
+
+    private void FuncFParam() {//FuncFParam → BType Ident ['[' ']' { '[' ConstExp ']' }]
+        BType();
+        addToken("IDENFR");
+        if (Objects.equals(symTab.get(t).getIdCode(), "LBRACK")) {
+            addToken("LBRACK");
+            addToken("RBRACK");
+            while (Objects.equals(symTab.get(t).getIdCode(), "LBRACK")) {
+                addToken("LBRACK");
+                ConstExp();
+                addToken("RBRACK");
+            }
+        }
+        out.add("<FuncFParam>");
+    }
+
+    private void Block_() { // '{' { BlockItem } '}'
+        addToken("LBRACE");
+        while (!Objects.equals(symTab.get(t).getIdCode(), "RBRACE")) {
+            //System.out.println("???BlockItem");
+            BlockItem();
+            //System.out.println("???BlockItem END");
+        }
+        addToken("RBRACE");
+        out.add("<Block>");
+    }
+
+    private void BlockItem() {// Decl | Stmt
+        if (isDecl()) {
+            Decl();
+        } else {
+            //System.out.println("???Stmt");
+            Stmt();
+            //System.out.println("???Stmt end");
+        }
+        //out.add("<BlockItem>");
+    }
+
+    /*
+    Stmt → LVal '=' Exp ';' // 每种类型的语句都要覆盖
+    | [Exp] ';' //有无Exp两种情况
+    | Block
+    | 'if' '(' Cond ')' Stmt [ 'else' Stmt ] // 1.有else 2.无else
+    | 'while' '(' Cond ')' Stmt
+    | 'break' ';'
+    | 'continue' ';'
+    | 'return' [Exp] ';' // 1.有Exp 2.无Exp
+    | LVal '=' 'getint''('')'';'
+    | 'printf''('FormatString{','Exp}')'';' // 1.有Exp 2.无Exp
+     */
+    private void Stmt() {
+        if (Objects.equals(symTab.get(t).getIdCode(), "IFTK")) {
+            //System.out.println(1);
+            addToken("IFTK");
+            addToken("LPARENT");
+            Cond();
+            addToken("RPARENT");
+            Stmt();
+            if (Objects.equals(symTab.get(t).getIdCode(), "ELSETK")) {
+                addToken("ELSETK");
+                Stmt();
+            }
+        } else if (Objects.equals(symTab.get(t).getIdCode(), "WHILETK")) {
+            //System.out.println(2);
+            addToken("WHILETK");
+            addToken("LPARENT");
+            Cond();
+            addToken("RPARENT");
+            Stmt();
+        } else if (Objects.equals(symTab.get(t).getIdCode(), "BREAKTK")) {
+            addToken("BREAKTK");
+            addToken("SEMICN");
+        } else if (Objects.equals(symTab.get(t).getIdCode(), "CONTINUETK")) {
+            addToken("CONTINUETK");
+            addToken("SEMICN");
+        } else if (Objects.equals(symTab.get(t).getIdCode(), "RETURNTK")) {
+            addToken("RETURNTK");
+            if (!Objects.equals(symTab.get(t).getIdCode(), "SEMICN")) {
+                Exp();
+            }
+            addToken("SEMICN");
+        } else if (Objects.equals(symTab.get(t).getIdCode(), "PRINTFTK")) {
+            addToken("PRINTFTK");
+            addToken("LPARENT");
+            addToken("STRCON");
+            while (Objects.equals(symTab.get(t).getIdCode(), "COMMA")) {
+                addToken("COMMA");
+                ////System.out.println("！！！Exp");
+                Exp();
+                ////System.out.println("！！！Exp end");
+            }
+            addToken("RPARENT");
+            addToken("SEMICN");
+        } else if (Objects.equals(symTab.get(t).getIdCode(), "LBRACE")) {
+            //System.out.println(3);
+            Block_();
+        } else if (isLVal()) {
+            //System.out.println(4);
+            ////System.out.println("???lvAL");
+            LVal();
+            ////System.out.println("???lvAL END");
+            addToken("ASSIGN");
+            if (Objects.equals(symTab.get(t).getIdCode(), "GETINTTK")) {
+                addToken("GETINTTK");
+                addToken("LPARENT");
+                addToken("RPARENT");
+                addToken("SEMICN");
+            } else {
+                Exp();
+                addToken("SEMICN");
+            }
+        } else {
+            //System.out.println(5);
+            if (!Objects.equals(symTab.get(t).getIdCode(), "SEMICN")) {
+                //System.out.println("???Exp");
+                Exp();
+                //System.out.println("???Exp end");
+            }
+            addToken("SEMICN");
+        }
+        out.add("<Stmt>");
+    }
+
+    private boolean isLVal() {
+        if(Objects.equals(symTab.get(t).getIdCode(), "SEMICN")) {
+            return false;
+        }
+        int q = t + 1;
+        boolean flag = false;
+        while (!Objects.equals(symTab.get(q).getIdCode(), "SEMICN")) {
+            if (Objects.equals(symTab.get(q).getIdCode(), "ASSIGN")) {
+                flag = true;
+            }
+            q++;
+        }
+        return flag;
+    }
+
+    private void LVal() {//LVal → Ident {'[' Exp ']'}
+        addToken("IDENFR");
+        while (Objects.equals(symTab.get(t).getIdCode(), "LBRACK")) {
+            addToken("LBRACK");
+            Exp();
+            addToken("RBRACK");
+        }
+        out.add("<LVal>");
+    }
+
+    private void Exp() {// Exp → AddExp
+        AddExp();
+        out.add("<Exp>");
+    }
+
+    private void Cond() {//Cond → LOrExp
+        LorExp();
+        out.add("<Cond>");
+    }
+
+    private void LorExp() {//LOrExp → LAndExp | LOrExp '||' LAndExp
+        LAndExp();
+        while (Objects.equals(symTab.get(t).getIdCode(), "OR")) {
+            addToken("OR");
+            LAndExp();
+        }
+        out.add("<LorExp>");
+    }
+
+    private void LAndExp() {//LAndExp → EqExp | LAndExp '&&' EqExp
+        EqExp();
+        while (Objects.equals(symTab.get(t).getIdCode(), "AND")) {
+            addToken("AND");
+            EqExp();
+        }
+        out.add("<LAndExp>");
+    }
+
+    private void EqExp() { //EqExp → RelExp | EqExp ('==' | '!=') RelExp
+        RelExp();
+        while (Objects.equals(symTab.get(t).getIdCode(), "EQL") || Objects.equals(symTab.get(t).getIdCode(), "NEQ")) {
+            if (Objects.equals(symTab.get(t).getIdCode(), "EQL")) {
+                addToken("EQL");
+            } else {
+                addToken("NEQ");
+            }
+            RelExp();
+        }
+        out.add("<EqExp>");
+    }
+
+    private void RelExp() {//RelExp → AddExp | RelExp ('<' | '>' | '<=' | '>=') AddExp
+        AddExp();
+        while (Objects.equals(symTab.get(t).getIdCode(), "LSS") ||
+                Objects.equals(symTab.get(t).getIdCode(), "LEQ") ||
+                Objects.equals(symTab.get(t).getIdCode(), "GRE") ||
+                Objects.equals(symTab.get(t).getIdCode(), "GEQ")) {
+            if (Objects.equals(symTab.get(t).getIdCode(), "LSS")) {
+                addToken("LSS");
+                AddExp();
+            } else if (Objects.equals(symTab.get(t).getIdCode(), "LEQ")) {
+                addToken("LEQ");
+                AddExp();
+            } else if (Objects.equals(symTab.get(t).getIdCode(), "GRE")) {
+                addToken("GRE");
+                AddExp();
+            } else {
+                addToken("GEQ");
+                AddExp();
+            }
+        }
+        out.add("<RelExp>");
+    }
+
+    private void MainFuncDef() { //MainFuncDef → 'int' 'main' '(' ')' Block
+        addToken("INTTK");
+        addToken("MAINTK");
+        addToken("LPARENT");
+        addToken("RPARENT");
+        Block_();
+        out.add("<MainFuncDef>");
+    }
+
+}

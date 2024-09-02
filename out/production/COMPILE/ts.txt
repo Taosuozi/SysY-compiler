@@ -1,0 +1,36 @@
+const int c1 = 2
+const int c2 = 1
+const str str_0 = "\n" // 这里宣称字符串常量'\n'，用于后面输出
+
+int foo()
+para a
+para b
+t1 = a + b
+ret t1
+
+int func()
+t1 = c1 * c2
+ret t1
+
+int main()
+var int v1 = 0
+var int v2 = 1
+var int res
+
+push v1
+push v2
+call foo
+t1 = RET
+
+t2 = t1 + 1
+res = t2
+
+j else_end
+if_end: # label
+# else body :
+call func
+t3 = RET
+res = t3
+else_end:
+printf res
+printf str_0

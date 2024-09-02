@@ -1,0 +1,76 @@
+ .data
+2 str_0: .asciiz "\n" # str_0 "\n"
+3 .space 4
+4 str_end:
+5 .text
+6 li $fp, 0x10040000
+7
+8 j func_main
+9 nop
+10
+func_foo:
+lw $s0, 0($fp) # 加载参数a
+lw $s1, 4($fp) # 加载参数b
+add $v0, $s0, $s1 # 计算 a + b，作为函数的返回值
+jr $ra
+
+func_func:
+li $v0, 2 # 常量c1 * c2 = 2
+jr $ra
+
+21 func_main:
+li $s0, 0 # var v1 0
+li $s1, 1 # var v2 1
+
+sw $s0, 12($fp) # 传入参数 v1
+sw $s1, 16($fp) # 传入参数 v2
+32
+33 addi $sp, $sp, -12 # 压栈，保存现场
+34 sw $s0, 0($sp) # 保存现场，此处保存寄存器$s0
+35 sw $s1, 4($sp) # 保存现场，此处保存寄存器$s1
+36 sw $ra, 8($sp) # 保存现场，此处保存寄存器$ra
+37
+38 addi $fp, $fp, 12 # 移动帧指针
+39 jal func_foo # 调用函数foo()
+40 addi $fp, $fp, -12 # 移动帧指针
+41
+42 lw $s0, 0($sp) # 恢复现场
+43 lw $s1, 4($sp) # 恢复现场
+44 lw $ra, 8($sp) # 恢复现场
+45 addi $sp, $sp, 12 # 弹栈，恢复现场
+46
+47 move $t2, $v0
+48 addi $t3, $t2, 1 # 计算 res = foo(v1, v2) + 1
+49 move $s2, $t3 # $s2寄存器分配给变量res
+50
+51 j else_end # 不经过else语句块
+52
+53 if_end: # label if_end
+54 addi $sp, $sp, -16 # 压栈，保存现场
+55 sw $s0, 0($sp) # 保存现场，此处保存寄存器$s0
+56 sw $s1, 4($sp) # 保存现场，此处保存寄存器$s1
+57 sw $s2, 8($sp) # 保存现场，此处保存寄存器$s2
+58 sw $ra, 12($sp) # 保存现场，此处保存寄存器$ra
+59
+60 addi $fp, $fp, 12 # 移动帧指针
+61 jal func_func # 调用函数func()
+62 addi $fp, $fp, -12 # 移动帧指针
+63
+64 lw $s0, 0($sp) # 恢复现场
+65 lw $s1, 4($sp) # 恢复现场
+66 lw $s2, 8($sp) # 恢复现场
+67 lw $ra, 12($sp) # 恢复现场
+68 addi $sp, $sp, 16 # 弹栈，恢复现场
+69
+70 move $t4, $v0 # 临时寄存器$t4存储函数func()的返回值
+71 move $s2, $t4 # $s2寄存器分配给变量res
+72
+73 else_end: # label else_end
+74 li $v0, 1
+75 move $a0, $s2 # printf res
+76 syscall
+77 li $v0, 4
+78 la $a0, str_0 # printf "\n"
+79 syscall
+80 li $v0, 10
+81 syscall
